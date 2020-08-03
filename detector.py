@@ -2,6 +2,7 @@ import argparse
 import random
 import torch
 from transformers import *
+from logzero import setup_logger
 
 class Detector:
     def __init__(self, config):
@@ -43,8 +44,9 @@ class Detector:
 
         all_scores = output[0]
 
-        print('==========================')
-        print(sentence)
+        logger = self.config.logger
+        logger.debug('==========================')
+        logger.debug(sentence)
         is_strange = False
         total = 0
         for i in range(1, n_words - 1):
@@ -56,11 +58,17 @@ class Detector:
             is_strange = is_strange or score.value_std <= 0
             total += score.value_std
 
-            print('original word: {}: top score: {}'.format(score, top_scores))
+            logger.debug('original word: {}: top score: {}'.format(score, top_scores))
 
-        print(total / (n_words - 2))
-        if is_strange:
-            print('this sentence is strange')
+        average_score = total / (n_words - 2)
+        result_text = 'ng' if is_strange else 'ok'
+        result = '{}\t{:.3f}'.format(result_text, average_score)
+        logger.info(result)
+
+        if self.config.outputfile is not None:
+            with open(self.config.outputfile, 'a') as f:
+                f.write(result)
+                f.write('\n')
 
 class Score:
     def __init__(self, id, scores, tokenizer):
@@ -78,8 +86,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(add_help=True)
     parser.add_argument('filepath', help='file path to target sentences')
     parser.add_argument('--random', action='store_true', help='randomize word order')
+    parser.add_argument('--outputfile', default=None)
+    parser.add_argument('--loglevel', default='DEBUG')
     args = parser.parse_args()
-    print(args)
+
+    logger = setup_logger(name=__name__, level=args.loglevel)
+    logger.info(args)
+    args.logger = logger
 
     detector = Detector(args)
     detector.execute()
