@@ -55,7 +55,7 @@ class Detector:
 
             score = Score(input_ids[0][i], scores, self.tokenizer)
             top_scores = [Score(id.item(), scores, self.tokenizer) for id in topk.indices]
-            is_strange = is_strange or score.value_std <= 0
+            is_strange = is_strange or score.value_std < self.config.threshold
             total += score.value_std
 
             logger.debug('original word: {}: top score: {}'.format(score, top_scores))
@@ -85,6 +85,7 @@ class Score:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(add_help=True)
     parser.add_argument('filepath', help='file path to target sentences')
+    parser.add_argument('--threshold', type=float, default=0.8, help='sentence is strange when score is lower than this')
     parser.add_argument('--random', action='store_true', help='randomize word order')
     parser.add_argument('--outputfile', default=None)
     parser.add_argument('--loglevel', default='DEBUG')
