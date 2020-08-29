@@ -8,14 +8,24 @@ class Detector:
     def __init__(self, config):
         self.config = config
 
-        pretrained_weights = 'bert-base-uncased'
-        self.tokenizer = BertTokenizer.from_pretrained(pretrained_weights)
-        self.model = BertForMaskedLM.from_pretrained(pretrained_weights)
+        self.tokenizer, self.model = self.__create_model()
 
         with open(config.filepath, 'r') as f:
             self.sentences = [line.strip() for line in f.readlines()]
             if self.config.random:
                 self.sentences = [self.__randomize(s) for s in self.sentences]
+
+    def __create_model(self):
+        if self.config.lang == 'ja':
+            pretrained_weights = 'cl-tohoku/bert-base-japanese-whole-word-masking'
+            tokenizer = BertJapaneseTokenizer.from_pretrained(pretrained_weights)
+            model = BertForMaskedLM.from_pretrained(pretrained_weights)
+            return tokenizer, model
+
+        pretrained_weights = 'bert-base-uncased'
+        tokenizer = BertTokenizer.from_pretrained(pretrained_weights)
+        model = BertForMaskedLM.from_pretrained(pretrained_weights)
+        return tokenizer, model
 
     def __randomize(self, sentence):
         words = sentence.split()
@@ -29,6 +39,7 @@ class Detector:
 
     def detect(self, sentence):
         list = []
+        
         input_ids = torch.tensor([self.tokenizer.encode(sentence, add_special_tokens=True)])
         n_words = input_ids.shape[1]
         # replace each token except from <CLS>, <SEP> with <MASK>
@@ -43,10 +54,11 @@ class Detector:
             output = self.model(input)
 
         all_scores = output[0]
+        print(all_scores.shape)
 
         logger = self.config.logger
         logger.debug('==========================')
-        logger.debug(sentence)
+        logger.debug(self.tokenizer.tokenize(sentence))
         is_strange = False
         total = 0
         for i in range(1, n_words - 1):
@@ -85,6 +97,7 @@ class Score:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(add_help=True)
     parser.add_argument('filepath', help='file path to target sentences')
+    parser.add_argument('--lang', default='en', help='language')
     parser.add_argument('--threshold', type=float, default=0.8, help='sentence is strange when score is lower than this')
     parser.add_argument('--random', action='store_true', help='randomize word order')
     parser.add_argument('--outputfile', default=None)
