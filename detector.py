@@ -54,7 +54,6 @@ class Detector:
             output = self.model(input)
 
         all_scores = output[0]
-        print(all_scores.shape)
 
         logger = self.config.logger
         logger.debug('==========================')
@@ -67,12 +66,15 @@ class Detector:
 
             score = Score(input_ids[0][i], scores, self.tokenizer)
             top_scores = [Score(id.item(), scores, self.tokenizer) for id in topk.indices]
-            is_strange = is_strange or score.value_std < self.config.threshold
+            is_strange = is_strange or score.value_std < self.config.word_threshold
             total += score.value_std
 
             logger.debug('original word: {}: top score: {}'.format(score, top_scores))
 
         average_score = total / (n_words - 2)
+        if average_score < self.config.sentence_threshold:
+            is_strange = True
+
         result_text = 'ng' if is_strange else 'ok'
         result = '{}\t{:.3f}'.format(result_text, average_score)
         logger.info(result)
@@ -98,7 +100,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(add_help=True)
     parser.add_argument('filepath', help='file path to target sentences')
     parser.add_argument('--lang', default='en', help='language')
-    parser.add_argument('--threshold', type=float, default=0.8, help='sentence is strange when score is lower than this')
+    parser.add_argument('--word_threshold', type=float, default=0.5, help='sentence is strange when at least score of a token is lower than this')
+    parser.add_argument('--sentence_threshold', type=float, default=0.8, help='sentence is strange when average score is lower than this')
     parser.add_argument('--random', action='store_true', help='randomize word order')
     parser.add_argument('--outputfile', default=None)
     parser.add_argument('--loglevel', default='DEBUG')
